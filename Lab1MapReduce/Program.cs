@@ -59,12 +59,12 @@ namespace MapReduce
         private static void Main(string[] args)
         {
             var files =
-                Directory.EnumerateFiles(@"/Users/joachim/Documents/ece/SWD-Exercises/Extras/Books", "*.txt")
+                Directory.EnumerateFiles(@"/Users/joachim/Documents/ece/SWD-Exercises/Extras/cards", "*.txt")
                     .AsParallel();
 
             var wordCount = files.MapReduce(
-                path => Source(path),
-                map => Map(map),
+                path => DistributeMap(path),
+                map => KeySelector(map),
                 group => Reduce(group));
 
             var wc = wordCount.ToList();
@@ -77,28 +77,27 @@ namespace MapReduce
         }
 
         // Source() provides the source data on which the MapReduce query shall run. 
-        private static IEnumerable<string> Source(string path)
+        private static IEnumerable<KeyValuePair<string,int>> DistributeMap(string path)
         {
             return File.ReadLines(path) // Read all lines in the path
-                .SelectMany(line => line.ToLower().Split(new char[] {' ', ',', '.', '-', '!', '?', ';'}));
+                .Select<string,KeyValuePair<string,int>>(line => ParseToPair(line.ToLower().Split(new char[] {','})));
                 // Project the words into a single enumerable
         }
 
 
         // Map() returns the key which the word fits
-        private static string Map(string word)
+        private static string KeySelector(KeyValuePair<string,int> pair)
         {
-            return word;
+            return pair.Key;
         }
-
 
         // Reduce() returns a list of Key/value pairs representing the results
         // An IGrouping<> represents a set of values that have the same key
-        private static IEnumerable<KeyValuePair<string, int>> Reduce(IGrouping<string, string> group)
+        private static IEnumerable<KeyValuePair<string, int>> Reduce(IGrouping<string, KeyValuePair<string, int>> group)
         {
             return new KeyValuePair<string, int>[]
             {
-                new KeyValuePair<string, int>(group.Key, group.Count())
+                new KeyValuePair<string, int>(group.Key, group.Sum(pair => pair.Value))
             };
         }
 
@@ -106,6 +105,20 @@ namespace MapReduce
         private static int AscendingComparison(KeyValuePair<string, int> a, KeyValuePair<string, int> b)
         {
             return a.Value - b.Value;
+        }
+        
+        
+        private static KeyValuePair<string,int> ParseToPair(IEnumerable<string> line)
+        {
+            
+            var enumerable = line.ToList();
+            /*
+            var result = new List<KeyValuePair<string, int>>();
+            result.Add(new KeyValuePair<string, int>(enumerable.First(), int.Parse(enumerable.Last())));
+            return result;
+            */
+            return new KeyValuePair<string, int>(enumerable.First(), int.Parse(enumerable.Last()));
+
         }
     }
 }
